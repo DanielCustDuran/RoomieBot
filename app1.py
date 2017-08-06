@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request
-import mysql.connector
+#import mysql.connector
 import json
 import requests
 import config
 import re
 #import connect_db
-from conexion import busqueda,insertar
+from conexion import insertar
 #from patrons import Patrons_dict 
 import patrons
-import time
+#import time
 #from threading import Thread
 
 import threading
@@ -52,9 +52,12 @@ def verify():
 datos=[0,"","",0]
 @app.route('/', methods = ['POST'])
 def webhook():
+    #idface = 0
+    #tipe = ""
+    #name = ""
+    #tel = 0
     var = 0
     cont = 0
-    tipo_user = 0
     
     data = request.get_json()
     if data["object"] == "page":
@@ -62,7 +65,6 @@ def webhook():
             for messaging_event in entry["messaging"]:
                 if messaging_event.get("message"):
                     message_text = messaging_event["message"]["text"]
-                    message_text = message_text.lower()
                     long_dict = len(patrons.Patrons_dict)
                     for key in patrons.Patrons_dict.keys() :
                         cont+=1
@@ -70,56 +72,53 @@ def webhook():
                         #saludo_match = re.match(saludo, message_text)
                         saludo_match = dmatch(saludo,message_text)
                         if saludo_match:
-                            sender_id = messaging_event["sender"]["id"]
-                            recipient_id = messaging_event["recipient"]["id"]
                             var = 1
                             if estado(message_text)!=False:
                                 patrons.buscar(message_text)
                             if numero(message_text)!=False:
                                 datos[3]=numero(message_text)
+                                print datos[3]
                             if tipo(message_text)!=False:
                                 datos[1]=tipo(message_text)
-                                if tipo(message_text)=="alquiler":
-                                    tipo_user = 1
-                            if tipo_user == 1 and len(str(datos[0]))!=0 and len(datos[1])!=0 and len(datos[2])!=0 and len(str(datos[3]))!=0:
-                                for k in patrons.Patrons_Alquiler.keys():
-                                    mensaj = re.compile(k)
-                                    mensaj_match = dmatch(mensaj,message_text)
-                                    if mensaj_match:
-                                        print "trabajando en esto xd"
+                                print datos[1]
                             if nombre(message_text)!=False:
                                 datos[2]=nombre(message_text)
+                                print datos[2]
+                            sender_id = messaging_event["sender"]["id"]
+                            #recipient_id = messaging_event["recipient"]["id"]
                             datos[0]=int(sender_id)
                             #send_message(sender_id, patrons.Patrons_dict[key])
-                            send_message_thread = threading.Thread(target = send_message(sender_id, patrons.Patrons_dict[key]),)
+                            send_message_thread = threading.Thread(target = send_message(sender_id, patrons.Patrons_dict[key]), )
                             #send_message_thread.start()
-                            send_message_thread.run()
-                            
+                            send_message_thread.start()
+                            send_message_thread.join()
                             print "se inicio un nuevo thread " +  str(sender_id)
+                            print(datos[0])
+                            print(datos[1])
+                            print(datos[2])
+                            print(datos[3])
+
+                            inser_thread = threading.Thread( target = insertar(datos[0],datos[1],datos[2],datos[3]), )
+                            inser_thread.start()
+                            if len(str(datos[0]))!=0:
+                                if len(datos[1])!=0:
+                                    if len(datos[2])!=0:
+                                        if len(str(datos[3]))!=0:
+                                            print "execute query"
+                                            insertar(datos[0],datos[1],datos[2],datos[3])
+                                            print "executed query"
+                                            datos[0]=0
+                                            datos[1]=""
+                                            datos[2]=""
+                                            datos[3]= 93426032143
+                           
+                                
+
                         if var==0 and cont==long_dict:
                             sender_id = messaging_event["sender"]["id"]
-                            recipient_id = messaging_event["recipient"]["id"]
+                            #recipient_id = messaging_event["recipient"]["id"]
                             send_message(sender_id, "Disculpame :'( no te entiendo")
-                if messaging_event.get("delivery"):
-                    pass
-                if messaging_event.get("optin"):
-                    pass
-                if messaging_event.get("postback"):
-                    pass
-                print(datos[0])
-                print(datos[1])
-                print(datos[2])
-                print(datos[3])
-
-                if len(str(datos[0]))!=0:
-                    if len(datos[1])!=0:
-                        if len(datos[2])!=0:
-                            if len(str(datos[3]))!=0:
-                                insertar(datos[0],datos[1],datos[2],datos[3])
-                                datos[0]=0
-                                datos[1]=""
-                                datos[2]=""
-                                datos[3]=0
+                            
 
     return "ok", 200
 
@@ -171,7 +170,7 @@ def tipo(mensaje):
         return False
 def numero(cad):
     var = 0
-    if cad=="no tengo":
+    if cad=="no tengo" or cad=="No tengo":
         var=1
     elif cad[0].isdigit():
         cade = cad.replace("-", "")
